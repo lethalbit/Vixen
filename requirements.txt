@@ -1,0 +1,6 @@
+git+https://github.com/amaranth-lang/amaranth.git@master
+git+https://github.com/amaranth-lang/amaranth-soc.git@master
+git+https://github.com/amaranth-lang/amaranth-stdio.git@master
+
+Jinja2
+
