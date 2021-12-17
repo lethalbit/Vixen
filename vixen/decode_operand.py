@@ -22,24 +22,27 @@ class OperandDecoder(Elaboratable):
         op_offset   = Mux(is_indexed, 8, 0)
         imm_offset  = Mux(is_indexed, 16, 8)
 
-        is_literal           = self.i_data[6:8]                       == 0b00
-        is_literal_indexed   = self.i_data[14:16]                     == 0b00
-        is_index_indexed     = self.i_data[12:16]                     == 0x4
-        is_register          = self.i_data[4:8]                       == 0x5
-        is_register_indexed  = self.i_data[12:16]                     == 0x5
-        is_register_deferred = self.i_data.bit_select(op_offset+4, 4) == 0x6
-        is_autodec           = self.i_data.bit_select(op_offset+4, 4) == 0x7
-        is_autoinc           = self.i_data.bit_select(op_offset+4, 4) == 0x8
-        is_immediate         = self.i_data[0:8]                       == 0x8F
-        is_immediate_indexed = self.i_data[8:16]                      == 0x8F
-        is_autoinc_deferred  = self.i_data.bit_select(op_offset+4, 4) == 0x9
-        is_absolute          = self.i_data.bit_select(op_offset, 8)   == 0x9F
-        is_bytedisp          = self.i_data.bit_select(op_offset+4, 4) == 0xA
-        is_worddisp          = self.i_data.bit_select(op_offset+4, 4) == 0xB
-        is_longdisp          = self.i_data.bit_select(op_offset+4, 4) == 0xC
-        is_bytedisp_deferred = self.i_data.bit_select(op_offset+4, 4) == 0xD
-        is_worddisp_deferred = self.i_data.bit_select(op_offset+4, 4) == 0xE
-        is_longdisp_deferred = self.i_data.bit_select(op_offset+4, 4) == 0xF
+        opcode_nibble = self.i_data.bit_select(op_offset+4, 4)
+        opcode_byte   = self.i_data.bit_select(op_offset, 8)
+
+        is_literal           = self.i_data[6:8]   == 0b00
+        is_literal_indexed   = self.i_data[14:16] == 0b00
+        is_index_indexed     = self.i_data[12:16] == 0x4
+        is_register          = self.i_data[4:8]   == 0x5
+        is_register_indexed  = self.i_data[12:16] == 0x5
+        is_register_deferred = opcode_nibble      == 0x6
+        is_autodec           = opcode_nibble      == 0x7
+        is_autoinc           = opcode_nibble      == 0x8
+        is_immediate         = self.i_data[0:8]   == 0x8F
+        is_immediate_indexed = self.i_data[8:16]  == 0x8F
+        is_autoinc_deferred  = opcode_nibble      == 0x9
+        is_absolute          = opcode_byte        == 0x9F
+        is_bytedisp          = opcode_nibble      == 0xA
+        is_worddisp          = opcode_nibble      == 0xB
+        is_longdisp          = opcode_nibble      == 0xC
+        is_bytedisp_deferred = opcode_nibble      == 0xD
+        is_worddisp_deferred = opcode_nibble      == 0xE
+        is_longdisp_deferred = opcode_nibble      == 0xF
 
         literal_imm   = self.i_data[0:6] # indexed literal is illegal, so no shift needed
         autoinc_imm   = Mux(self.i_oplength == Length.BYTE, 1, Mux(self.i_oplength == Length.WORD, 2, Mux(self.i_oplength == Length.LONG, 4, 8)))
@@ -100,3 +103,14 @@ class OperandDecoder(Elaboratable):
             m.d.comb += self.o_length.eq(6)
 
         return m
+
+if __name__ == "__main__":
+    from amaranth.back import verilog
+
+    opdec = OperandDecoder()
+    ports = [
+        opdec.i_data, opdec.i_valid, opdec.i_oplength,
+        opdec.o_deferred, opdec.o_legalop, opdec.o_immed, opdec.o_immvalid, opdec.o_length
+    ]
+
+    print(verilog.convert(opdec, ports=ports))
