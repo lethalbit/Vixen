@@ -5,14 +5,14 @@ from util import Length
 class OperandDecoder(Elaboratable):
     def __init__(self):
         self.i_data     = Signal(6*8)
-        self.i_valid    = Signal(6)
+        self.i_valid    = Signal()
         self.i_oplength = Signal(Length)
 
         self.o_deferred = Signal()
         self.o_legalop  = Signal()
         self.o_immed    = Signal(32)
         self.o_immvalid = Signal()
-        self.o_length   = Signal(3)
+        self.o_length   = Signal(6)
 
     def elaborate(self, platform):
         m = Module()
@@ -89,18 +89,19 @@ class OperandDecoder(Elaboratable):
             m.d.comb += self.o_immed.eq(longdisp_imm)
 
         # Size routing
-        with m.If(is_one_byte):
-            m.d.comb += self.o_length.eq(1)
-        with m.Elif(is_two_byte):
-            m.d.comb += self.o_length.eq(2)
-        with m.Elif(is_three_byte):
-            m.d.comb += self.o_length.eq(3)
-        with m.Elif(is_four_byte):
-            m.d.comb += self.o_length.eq(4)
-        with m.Elif(is_five_byte):
-            m.d.comb += self.o_length.eq(5)
-        with m.Else(): # equivalent to m.Elif(is_six_byte)
-            m.d.comb += self.o_length.eq(6)
+        with m.If(self.i_valid):
+            with m.If(is_one_byte):
+                m.d.comb += self.o_length.eq(1 << 0)
+            with m.Elif(is_two_byte):
+                m.d.comb += self.o_length.eq(1 << 1)
+            with m.Elif(is_three_byte):
+                m.d.comb += self.o_length.eq(1 << 2)
+            with m.Elif(is_four_byte):
+                m.d.comb += self.o_length.eq(1 << 3)
+            with m.Elif(is_five_byte):
+                m.d.comb += self.o_length.eq(1 << 4)
+            with m.Else(): # equivalent to m.Elif(is_six_byte)
+                m.d.comb += self.o_length.eq(1 << 5)
 
         return m
 

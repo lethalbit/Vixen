@@ -2,6 +2,9 @@ from enum import Enum
 
 from amaranth import *
 
+from decode_operand import OperandDecoder
+from util import Length
+
 
 class Opcode(Enum):
     HALT   = 0x00
