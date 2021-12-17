@@ -1,6 +1,7 @@
 from enum import Enum
 
-from nmigen import *
+from amaranth import *
+
 
 class Opcode(Enum):
     HALT   = 0x00
@@ -36,117 +37,98 @@ class Opcode(Enum):
     BGEQU  = 0x1e
     BLSSU  = 0x1f
 
+    ADDB2  = 0x80
+    ADDB3  = 0x81
+
+    ADDW2  = 0xa0
+    ADDW3  = 0xa1
+
+    ADDL2  = 0xc0
+    ADDL3  = 0xc1
+
     # Extended opcode bytes, for convenience.
     EXOPFD = 0xfd
     EXOPFE = 0xfe
     EXOPFF = 0xff
 
-    # more to add...
-    BUGL   = 0xfdff
-    BUGW   = 0xfeff
+    @staticmethod
+    def _data():
+        # Opcode: (operand kind, data type)
+        # where operand kinds is a string of:
+        # - effective "a"ddress
+        # - "b"ranch displacement
+        # - "m"odified operand
+        # - "r"ead operand
+        # - effective address "v" (I don't know the difference between this and a)
+        # - "w"ritten operand
+        # data type is a string of:
+        # - "b"yte
+        # - "w"ord
+        # - "l"ongword
+        # - "q"uadword
+        return {
+            Opcode.ADDB2: ("rm", "bb"),
+            Opcode.ADDB3: ("rrw", "bbb"),
+            Opcode.ADDW2: ("rm", "ww"),
+            Opcode.ADDW3: ("rrw", "www"),
+            Opcode.ADDL2: ("rm", "ll"),
+            Opcode.ADDL3: ("rrw", "lll"),
+        }
+
+    @staticmethod
+    def zero_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 0]
+
+    @staticmethod
+    def one_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 1]
+
+    @staticmethod
+    def two_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 2]
+
+    @staticmethod
+    def three_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 3]
+
+    @staticmethod
+    def four_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 4]
+
+    @staticmethod
+    def five_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 5]
+
+    @staticmethod
+    def six_op_insns():
+        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 6]
 
 
-class OperandDecoder(Elaboratable):
+class OpcodeOperandCount(Elaboratable):
     def __init__(self):
-        self.i_data  = Signal(48)
-        self.i_valid = Signal(6)
-        self.i_oplength = Signal(2)
-
-        self.o_needmore = Signal()
-        self.o_immed    = Signal(32)
-        self.o_immvalid = Signal()
+        self.i_opcode = Signal(16)
+        self.o_count  = Signal(range(6))
 
     def elaborate(self, platform):
         m = Module()
 
-        m.d.comb += [
-            self.o_needmore.eq(1),
-            self.o_immvalid.eq(0)
-        ]
-
-        # What kind of operand is this?
-        # TODO: I am not as confident with pattern syntax as I thought I was; this needs checking.
-        with m.Switch(self.i_data[0:8]):
-            with m.Case("00------"): # literal
-                m.d.comb += [
-                    self.o_immed.eq(self.i_data[0:6]),
-                    self.o_immvalid.eq(1)
-                ]
-            with m.Case("0100----"): # index mode
-                with m.Switch(self.i_data[8:16]):
-                    with m.Case("00------"): # literal indexed (forbidden)
-                        # TODO: Rightward lean is a bit much, maybe these should be flattened together?
-                        pass
-                    with m.Case("0100----"): # index indexed (forbidden)
-                        pass
-                    with m.Case("0101----"): # register indexed (forbidden)
-                        pass
-                    with m.Case("0110----"): # register deferred indexed
-                        pass
-                    with m.Case("0111----"): # autodecrement indexed
-                        pass
-                    with m.Case("10001111"): # immediate indexed (forbidden)
-                        pass
-                    with m.Case("1000----"): # autoincrement indexed
-                        pass
-                    with m.Case("10011111"): # absolute indexed
-                        pass
-                    with m.Case("1001----"): # autoincrement deferred indexed
-                        pass
-                    with m.Case("1010----"): # byte displacement indexed
-                        pass
-                    with m.Case("1011----"): # word displacement indexed
-                        pass
-                    with m.Case("1100----"): # long displacement indexed
-                        pass
-                    with m.Case("1101----"): # byte displacement deferred indexed
-                        pass
-                    with m.Case("1110----"): # word displacement deferred indexed
-                        pass
-                    with m.Case("1111----"): # long displacement deferred indexed
-                        pass
-            with m.Case("0101----"): # register
-                pass
-            with m.Case("0110----"): # register deferred
-                pass
-            with m.Case("0111----"): # autodecrement
-                pass
-            with m.Case("10001111"): # immediate
-                pass
-            with m.Case("1000----"): # autoincrement
-                pass
-            with m.Case("10011111"): # absolute
-                pass
-            with m.Case("1001----"): # autoincrement deferred
-                pass
-            with m.Case("1010----"): # byte displacement
-                with m.If(self.i_valid[1]):
-                    m.d.comb += [
-                        self.o_immed.eq(Cat(self.i_data[8:16], Repl(self.i_data[15], 24))),
-                        self.o_immvalid.eq(1)
-                    ]
-            with m.Case("1011----"): # word displacement
-                with m.If(self.i_valid[1] & self.i_valid[2]):
-                    m.d.comb += [
-                        self.o_immed.eq(Cat(self.i_data[8:24], Repl(self.i_data[23], 16))),
-                        self.o_immvalid.eq(1)
-                    ]
-            with m.Case("1100----"): # longword displacement
-                pass
-            with m.Case("1101----"): # byte displacement deferred
-                with m.If(self.i_valid[1]):
-                    m.d.comb += [
-                        self.o_immed.eq(Cat(self.i_data[8:16], Repl(self.i_data[15], 24))),
-                        self.o_immvalid.eq(1)
-                    ]
-            with m.Case("1110----"): # word displacement deferred
-                with m.If(self.i_valid[1] & self.i_valid[2]):
-                    m.d.comb += [
-                        self.o_immed.eq(Cat(self.i_data[8:24], Repl(self.i_data[23], 16))),
-                        self.o_immvalid.eq(1)
-                    ]
-            with m.Case("1111----"): # longword displacement deferred
-                pass
+        with m.Switch(self.i_opcode):
+            with m.Case(Opcode.zero_op_insns()):
+                m.d.comb += self.o_count.eq(0)
+            with m.Case(Opcode.one_op_insns()):
+                m.d.comb += self.o_count.eq(1)
+            with m.Case(Opcode.two_op_insns()):
+                m.d.comb += self.o_count.eq(2)
+            with m.Case(Opcode.three_op_insns()):
+                m.d.comb += self.o_count.eq(3)
+            with m.Case(Opcode.four_op_insns()):
+                m.d.comb += self.o_count.eq(4)
+            with m.Case(Opcode.five_op_insns()):
+                m.d.comb += self.o_count.eq(5)
+            with m.Case(Opcode.six_op_insns()):
+                m.d.comb += self.o_count.eq(6)
+            with m.Default():
+                m.d.comb += self.o_count.eq(0)
 
         return m
 
