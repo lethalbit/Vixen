@@ -23,6 +23,7 @@ class Opcode(Enum):
     PROBEW = 0x0d
     INSQUE = 0x0e
     REMQUE = 0x0f
+
     BSBB   = 0x10
     BRB    = 0x11
     BNEQ   = 0x12
@@ -39,6 +40,40 @@ class Opcode(Enum):
     BVS    = 0x1d
     BGEQU  = 0x1e
     BLSSU  = 0x1f
+
+    ADDP4  = 0x20
+    ADDP6  = 0x21
+    SUBP4  = 0x22
+    SUBP6  = 0x23
+    CVTPT  = 0x24
+    MULP   = 0x25
+    CVTTP  = 0x26
+    DIVP   = 0x27
+    MOVC3  = 0x28
+    CMPC3  = 0x29
+    SCANC  = 0x2a
+    SPANC  = 0x2b
+    MOVC5  = 0x2c
+    CMPC5  = 0x2d
+    MOVTC  = 0x2e
+    MOVTUC = 0x2f
+
+    BSBW   = 0x30
+    BRW    = 0x31
+    CVTWL  = 0x32
+    CVTWB  = 0x33
+    MOVP   = 0x34
+    CMPP3  = 0x35
+    CVTPL  = 0x36
+    CMPP4  = 0x37
+    EDITPC = 0x38
+    MATCHC = 0x39
+    LOCC   = 0x3a
+    SKPC   = 0x3b
+    MOVZWL = 0x3c
+    ACBW   = 0x3d
+    MOVAW  = 0x3e
+    PUSHAW = 0x3f
 
     ADDB2  = 0x80
     ADDB3  = 0x81
@@ -70,6 +105,7 @@ class Opcode(Enum):
         # - "l"ongword
         # - "q"uadword
         return {
+            # 0x00 (misc)
             Opcode.HALT:   ("", ""),
             Opcode.NOP:    ("", ""),
             Opcode.REI:    ("", ""),
@@ -86,13 +122,52 @@ class Opcode(Enum):
             Opcode.PROBEW: ("rra", "bwb"),
             Opcode.INSQUE: ("aa", "bb"),
             Opcode.REMQUE: ("aw", "bl"),
-
+            # 0x10 (branches/jumps)
+            Opcode.BSBB:   ("b", "b"),
+            Opcode.BRB:    ("b", "b"),
+            Opcode.BNEQ:   ("b", "b"),
+            Opcode.BEQL:   ("b", "b"),
+            Opcode.BGTR:   ("b", "b"),
+            Opcode.BLEQ:   ("b", "b"),
+            Opcode.JSB:    ("a", "b"),
+            Opcode.JMP:    ("a", "b"),
+            Opcode.BGEQ:   ("b", "b"),
+            Opcode.BLSS:   ("b", "b"),
+            Opcode.BGTRU:  ("b", "b"),
+            Opcode.BLEQU:  ("b", "b"),
+            Opcode.BVC:    ("b", "b"),
+            Opcode.BVS:    ("b", "b"),
+            Opcode.BGEQU:  ("b", "b"),
+            Opcode.BLSSU:  ("b", "b"),
+            # 0x20 (packed decimal)
+            Opcode.ADDP4:  ("rara", "wbwb"),
+            Opcode.ADDP6:  ("rarara", "wbwbwb"),
+            Opcode.SUBP4:  ("rara", "wbwb"),
+            Opcode.SUBP6:  ("rarara", "wbwbwb"),
+            # 0x30 (packed decimal and conversions)
+            Opcode.BSBW:   ("b", "w"),
+            Opcode.BRW:    ("b", "w"),
+            Opcode.CVTWL:  ("rw", "wl"),
+            Opcode.CVTWB:  ("rw", "wb"),
+            Opcode.MOVP:   ("raa", "wbb"),
+            Opcode.CMPP3:  ("raa", "wbb"),
+            Opcode.CVTPL:  ("raw", "wbl"),
+            Opcode.CMPP4:  ("rara", "wbwb"),
+            Opcode.EDITPC: ("raaa", "wbbb"),
+            Opcode.MATCHC: ("rara", "wbwb"),
+            Opcode.LOCC:   ("rra", "bwb"),
+            Opcode.SKPC:   ("rra", "bwb"),
+            Opcode.MOVZWL: ("rw", "wl"),
+            Opcode.ACBW:   ("rrmb", "wwww"),
+            Opcode.MOVAW:  ("aw", "wl"),
+            Opcode.PUSHAW: ("a", "w"),
+            # 0x80 (byte math)
             Opcode.ADDB2:  ("rm", "bb"),
             Opcode.ADDB3:  ("rrw", "bbb"),
-
+            # 0xa0 (word math)
             Opcode.ADDW2:  ("rm", "ww"),
             Opcode.ADDW3:  ("rrw", "www"),
-
+            # 0xc0 (longword math)
             Opcode.ADDL2:  ("rm", "ll"),
             Opcode.ADDL3:  ("rrw", "lll"),
         }
