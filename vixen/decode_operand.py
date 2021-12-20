@@ -6,13 +6,20 @@ class OperandDecoder(Elaboratable):
     def __init__(self):
         self.i_data     = Signal(6*8)
         self.i_valid    = Signal()
-        self.i_oplength = Signal(Length)
+        self.i_operidx  = Signal(6, reset=1)
+        self.i_operlen1 = Signal(Length)
+        self.i_operlen2 = Signal(Length)
+        self.i_operlen3 = Signal(Length)
+        self.i_operlen4 = Signal(Length)
+        self.i_operlen5 = Signal(Length)
+        self.i_operlen6 = Signal(Length)
 
         self.o_deferred = Signal()
         self.o_legalop  = Signal()
         self.o_immed    = Signal(32)
         self.o_immvalid = Signal()
         self.o_length   = Signal(6)
+        self.o_nextidx  = Signal(6)
 
     def elaborate(self, platform):
         m = Module()
@@ -44,10 +51,25 @@ class OperandDecoder(Elaboratable):
         is_worddisp_deferred = opcode_nibble      == 0xE
         is_longdisp_deferred = opcode_nibble      == 0xF
 
+        oplength = Signal(Length)
+        with m.Switch(self.i_operidx):
+            with m.Case("-----1"):
+                m.d.comb += oplength.eq(self.i_operlen1)
+            with m.Case("----1-"):
+                m.d.comb += oplength.eq(self.i_operlen2)
+            with m.Case("---1--"):
+                m.d.comb += oplength.eq(self.i_operlen3)
+            with m.Case("--1---"):
+                m.d.comb += oplength.eq(self.i_operlen4)
+            with m.Case("-1----"):
+                m.d.comb += oplength.eq(self.i_operlen5)
+            with m.Case("1-----"):
+                m.d.comb += oplength.eq(self.i_operlen6)
+
         literal_imm   = self.i_data[0:6] # indexed literal is illegal, so no shift needed
-        autoinc_imm   = Mux(self.i_oplength == Length.BYTE, 1, Mux(self.i_oplength == Length.WORD, 2, Mux(self.i_oplength == Length.LONG, 4, 8)))
+        autoinc_imm   = Mux(oplength == Length.BYTE, 1, Mux(oplength == Length.WORD, 2, Mux(oplength == Length.LONG, 4, 8)))
         autodec_imm   = -autoinc_imm
-        immediate_imm = Mux(self.i_oplength == Length.BYTE, self.i_data[8:16], Mux(self.i_oplength == Length.WORD, self.i_data[8:24], self.i_data[8:40]))
+        immediate_imm = Mux(oplength == Length.BYTE, self.i_data[8:16], Mux(oplength == Length.WORD, self.i_data[8:24], self.i_data[8:40]))
         absolute_imm  = self.i_data.bit_select(imm_offset, 32)
         bytedisp_imm  = Cat(self.i_data.bit_select(imm_offset, 8), Repl(self.i_data.bit_select(imm_offset + 7, 1), 24))
         worddisp_imm  = Cat(self.i_data.bit_select(imm_offset, 16), Repl(self.i_data.bit_select(imm_offset + 15, 1), 16))
@@ -55,12 +77,12 @@ class OperandDecoder(Elaboratable):
 
         is_one_byte           = (~is_indexed) & (is_literal | is_register | is_register_deferred | is_autodec | is_autoinc | is_autoinc_deferred)
         is_one_byte_indexed   = is_indexed & (is_literal | is_register | is_register_deferred | is_autodec | is_autoinc | is_autoinc_deferred)
-        is_two_byte           = is_one_byte_indexed | ((self.i_oplength == Length.BYTE) & is_immediate) | ((~is_indexed) & (is_bytedisp | is_bytedisp_deferred))
+        is_two_byte           = is_one_byte_indexed | ((oplength == Length.BYTE) & is_immediate) | ((~is_indexed) & (is_bytedisp | is_bytedisp_deferred))
         is_two_byte_indexed   = is_indexed & (is_bytedisp | is_bytedisp_deferred)
-        is_three_byte         = is_two_byte_indexed | ((self.i_oplength == Length.WORD) & is_immediate) | ((~is_indexed) & (is_worddisp | is_worddisp_deferred))
+        is_three_byte         = is_two_byte_indexed | ((oplength == Length.WORD) & is_immediate) | ((~is_indexed) & (is_worddisp | is_worddisp_deferred))
         is_three_byte_indexed = is_indexed & (is_worddisp | is_worddisp_deferred)
         is_four_byte          = is_three_byte_indexed
-        is_five_byte          = (~is_indexed) & (((self.i_oplength == Length.LONG) & is_immediate) | is_absolute | is_longdisp | is_longdisp_deferred)
+        is_five_byte          = (~is_indexed) & (((oplength == Length.LONG) & is_immediate) | is_absolute | is_longdisp | is_longdisp_deferred)
         is_five_byte_indexed  = is_indexed & (is_absolute | is_longdisp | is_longdisp_deferred)
         is_six_byte           = is_five_byte_indexed
 
@@ -103,6 +125,9 @@ class OperandDecoder(Elaboratable):
             with m.Else(): # equivalent to m.Elif(is_six_byte)
                 m.d.comb += self.o_length.eq(1 << 5)
 
+        # Operand index routing
+        m.d.comb += self.o_nextidx.eq(self.i_operidx.rotate_left(1))
+
         return m
 
 if __name__ == "__main__":
@@ -110,7 +135,7 @@ if __name__ == "__main__":
 
     opdec = OperandDecoder()
     ports = [
-        opdec.i_data, opdec.i_valid, opdec.i_oplength,
+        opdec.i_data, opdec.i_valid, opdec.i_operlen1, opdec.i_operlen2, opdec.i_operlen3, opdec.i_operlen4, opdec.i_operlen5, opdec.i_operlen6,
         opdec.o_deferred, opdec.o_legalop, opdec.o_immed, opdec.o_immvalid, opdec.o_length
     ]
 
