@@ -144,6 +144,18 @@ class Opcode(Enum):
             Opcode.ADDP6:  ("rarara", "wbwbwb"),
             Opcode.SUBP4:  ("rara", "wbwb"),
             Opcode.SUBP6:  ("rarara", "wbwbwb"),
+            Opcode.CVTPT:  ("raara", "wbbwb"),
+            Opcode.MULP:   ("rarara", "wbwbwb"),
+            Opcode.CVTTP:  ("raara", "wbbwb"),
+            Opcode.DIVP:   ("rarara", "wbwbwb"),
+            Opcode.MOVC3:  ("raa", "wbb"),
+            Opcode.CMPC3:  ("raa", "wbb"),
+            Opcode.SCANC:  ("raar", "wbbb"),
+            Opcode.SPANC:  ("raar", "wbbb"),
+            Opcode.MOVC5:  ("rarra", "wbbwb"),
+            Opcode.CMPC5:  ("rarra", "wbbwb"),
+            Opcode.MOVTC:  ("rarara", "wbbbwb"),
+            Opcode.MOVTUC: ("rarara", "wbbbwb"),
             # 0x30 (packed decimal and conversions)
             Opcode.BSBW:   ("b", "w"),
             Opcode.BRW:    ("b", "w"),
@@ -246,3 +258,87 @@ class VaxDecoder(Elaboratable):
                     ]
 
         return m
+
+
+class VaxDecoderTest(Elaboratable):
+    def __init__(self):
+        self.width = 1 + 6*6
+
+        self.i_data = Signal(self.width*8)
+
+        self.o_operands = Signal(self.width)
+
+    def elaborate(self, platform):
+        m = Module()
+
+        operlen1 = Signal(Length)
+        operlen2 = Signal(Length)
+        operlen3 = Signal(Length)
+        operlen4 = Signal(Length)
+        operlen5 = Signal(Length)
+        operlen6 = Signal(Length)
+
+        # Only 31 operand decoders are needed to decode 37 bytes of instruction stream.
+        # - the first byte is always an opcode byte.
+        # - a longword displacement indexed operand is 6 bytes.
+        # - an INDEX opcode has 6 operands, so you need 5*6 decoders for 5 operands, and then a 31st for the 6th operand byte.
+        operands = [None] + [OperandDecoder() for _ in range(5*6 + 1)]
+        for i in range(1, 5*6 + 2):
+            m.submodules[f"decoder_{i}"] = decoder = operands[i]
+
+            valid = []
+            for j in range(1, 6):
+                if i > (j + 1):
+                    valid.append((i-j, operands[i-j].o_length[j]))
+            valid_signal = Cat([signal for _, signal in valid])
+
+            for j in range(len(valid_signal)):
+                case = ["-"] * len(valid_signal)
+                case[j] = "1"
+                with m.If(valid_signal.matches(''.join(case))):
+                    m.d.comb += decoder.i_operidx.eq(operands[valid[j][0]].o_nextidx)
+
+            m.d.comb += [
+                self.o_operands[i].eq(valid_signal.any()),
+
+                decoder.i_data.eq(self.i_data.bit_select(8 * i, 48)),
+                decoder.i_valid.eq(self.o_operands[i]),
+                decoder.i_operlen1.eq(operlen1),
+                decoder.i_operlen2.eq(operlen2),
+                decoder.i_operlen3.eq(operlen3),
+                decoder.i_operlen4.eq(operlen4),
+                decoder.i_operlen5.eq(operlen5),
+                decoder.i_operlen6.eq(operlen6),
+            ]
+
+        # the "seed"
+        with m.If(self.i_data[0:8].matches(Opcode.EXOPFD, Opcode.EXOPFE, Opcode.EXOPFF)):
+            m.d.comb += self.o_operands[2].eq(1)
+        with m.Else():
+            m.d.comb += self.o_operands[1].eq(1)
+
+        operlens = [operlen1, operlen2, operlen3, operlen4, operlen5, operlen6]
+        for operand in range(7):
+            for opcode in Opcode.nth_op_byte_insns(operand):
+                with m.If(self.i_data[0:8] == opcode):
+                    m.d.comb += operlens[operand].eq(Length.BYTE)
+            for opcode in Opcode.nth_op_word_insns(operand):
+                with m.If(self.i_data[0:8] == opcode):
+                    m.d.comb += operlens[operand].eq(Length.WORD)
+            for opcode in Opcode.nth_op_long_insns(operand):
+                with m.If(self.i_data[0:8] == opcode):
+                    m.d.comb += operlens[operand].eq(Length.LONG)
+
+        return m
+
+
+if __name__ == "__main__":
+    from amaranth.back import rtlil
+
+    opdec = VaxDecoderTest()
+    ports = [
+        opdec.i_data,
+        opdec.o_operands,
+    ]
+
+    print(rtlil.convert(opdec, ports=ports))
