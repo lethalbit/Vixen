@@ -55,7 +55,7 @@ class Opcode(Enum):
     EXOPFF = 0xff
 
     @staticmethod
-    def _data():
+    def _data() -> dict[Enum, tuple[str, str]]:
         # Opcode: (operand kind, data type)
         # where operand kinds is a string of:
         # - effective "a"ddress
@@ -70,41 +70,48 @@ class Opcode(Enum):
         # - "l"ongword
         # - "q"uadword
         return {
-            Opcode.ADDB2: ("rm", "bb"),
-            Opcode.ADDB3: ("rrw", "bbb"),
-            Opcode.ADDW2: ("rm", "ww"),
-            Opcode.ADDW3: ("rrw", "www"),
-            Opcode.ADDL2: ("rm", "ll"),
-            Opcode.ADDL3: ("rrw", "lll"),
+            Opcode.HALT:   ("", ""),
+            Opcode.NOP:    ("", ""),
+            Opcode.REI:    ("", ""),
+            Opcode.BPT:    ("", ""),
+            Opcode.RET:    ("", ""),
+            Opcode.RSB:    ("", ""),
+            Opcode.LDPCTX: ("", ""),
+            Opcode.SVPCTX: ("", ""),
+            Opcode.CVTPS:  ("rara", "wbwb"),
+            Opcode.CVTSP:  ("rara", "wbwb"),
+            Opcode.INDEX:  ("rrrrrw", "llllll"),
+            Opcode.CRC:    ("arra", "blwb"),
+            Opcode.PROBER: ("rra", "bwb"),
+            Opcode.PROBEW: ("rra", "bwb"),
+            Opcode.INSQUE: ("aa", "bb"),
+            Opcode.REMQUE: ("aw", "bl"),
+
+            Opcode.ADDB2:  ("rm", "bb"),
+            Opcode.ADDB3:  ("rrw", "bbb"),
+
+            Opcode.ADDW2:  ("rm", "ww"),
+            Opcode.ADDW3:  ("rrw", "www"),
+
+            Opcode.ADDL2:  ("rm", "ll"),
+            Opcode.ADDL3:  ("rrw", "lll"),
         }
 
     @staticmethod
-    def zero_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 0]
+    def n_op_insns(operand_count=0):
+        return [opcode for opcode, data in Opcode._data().items() if len(data[0]) == operand_count]
 
     @staticmethod
-    def one_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 1]
+    def nth_op_byte_insns(operand=0):
+        return [opcode for opcode, data in Opcode._data().items() if len(data[1]) > operand and data[1][operand] == "b"]
 
     @staticmethod
-    def two_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 2]
+    def nth_op_word_insns(operand=0):
+        return [opcode for opcode, data in Opcode._data().items() if len(data[1]) > operand and data[1][operand] == "w"]
 
     @staticmethod
-    def three_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 3]
-
-    @staticmethod
-    def four_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 4]
-
-    @staticmethod
-    def five_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 5]
-
-    @staticmethod
-    def six_op_insns():
-        return [opcode for opcode, data in Opcode._data() if len(data[0]) == 6]
+    def nth_op_long_insns(operand=0):
+        return [opcode for opcode, data in Opcode._data().items() if len(data[1]) > operand and data[1][operand] == "l"]
 
 
 class OpcodeOperandCount(Elaboratable):
@@ -116,20 +123,9 @@ class OpcodeOperandCount(Elaboratable):
         m = Module()
 
         with m.Switch(self.i_opcode):
-            with m.Case(Opcode.zero_op_insns()):
-                m.d.comb += self.o_count.eq(0)
-            with m.Case(Opcode.one_op_insns()):
-                m.d.comb += self.o_count.eq(1)
-            with m.Case(Opcode.two_op_insns()):
-                m.d.comb += self.o_count.eq(2)
-            with m.Case(Opcode.three_op_insns()):
-                m.d.comb += self.o_count.eq(3)
-            with m.Case(Opcode.four_op_insns()):
-                m.d.comb += self.o_count.eq(4)
-            with m.Case(Opcode.five_op_insns()):
-                m.d.comb += self.o_count.eq(5)
-            with m.Case(Opcode.six_op_insns()):
-                m.d.comb += self.o_count.eq(6)
+            for operand_count in range(0, 7):
+                with m.Case(Opcode.n_op_insns(operand_count)):
+                    m.d.comb += self.o_count.eq(operand_count)
             with m.Default():
                 m.d.comb += self.o_count.eq(0)
 
