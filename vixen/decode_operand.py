@@ -52,19 +52,10 @@ class OperandDecoder(Elaboratable):
         is_longdisp_deferred = opcode_nibble      == 0xF
 
         oplength = Signal(Length)
-        with m.Switch(self.i_operidx):
-            with m.Case("-----1"):
-                m.d.comb += oplength.eq(self.i_operlen1)
-            with m.Case("----1-"):
-                m.d.comb += oplength.eq(self.i_operlen2)
-            with m.Case("---1--"):
-                m.d.comb += oplength.eq(self.i_operlen3)
-            with m.Case("--1---"):
-                m.d.comb += oplength.eq(self.i_operlen4)
-            with m.Case("-1----"):
-                m.d.comb += oplength.eq(self.i_operlen5)
-            with m.Case("1-----"):
-                m.d.comb += oplength.eq(self.i_operlen6)
+        operlens = [self.i_operlen1, self.i_operlen2, self.i_operlen3, self.i_operlen4, self.i_operlen5, self.i_operlen6]
+        for i, operlen in enumerate(operlens):
+            with m.If(self.i_operidx[i]):
+                m.d.comb += oplength.eq(operlen)
 
         literal_imm   = self.i_data[0:6] # indexed literal is illegal, so no shift needed
         autoinc_imm   = Mux(oplength == Length.BYTE, 1, Mux(oplength == Length.WORD, 2, Mux(oplength == Length.LONG, 4, 8)))
